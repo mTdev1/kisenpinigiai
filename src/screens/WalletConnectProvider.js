@@ -2,7 +2,10 @@ import React, { createContext, useState, useEffect } from 'react';
 import WalletConnect from '@walletconnect/client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-export const WalletConnectContext = createContext();
+export const WalletConnectContext = createContext({
+  connector: null,
+  setConnector: () => {},
+});
 
 export const WalletConnectProvider = ({ children }) => {
   const [connector, setConnector] = useState(null);

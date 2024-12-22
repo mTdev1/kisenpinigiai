@@ -60,30 +60,30 @@ const EditAccountScreen = ({ route, navigation }) => {
         return;
       }
 
-      if (!connector.connected) {
+      if (!connector?.connected) {
         await connector.createSession();
       }
 
-      connector.on('connect', (error, payload) => {
+      connector?.on('connect', (error, payload) => {
         if (error) {
           console.error('MetaMask klaida:', error);
           Alert.alert('Klaida', 'Nepavyko prisijungti prie MetaMask.');
           return;
         }
 
-        const { accounts } = payload.params[0];
+        const {accounts} = payload.params[0];
         const walletAddress = accounts[0];
 
         if (isChild) {
           setChildMetaMask(walletAddress);
           database()
             .ref(`/users/${auth().currentUser.uid}/children/${accountId}`)
-            .update({ metaMaskWallet: walletAddress });
+            .update({metaMaskWallet: walletAddress});
         } else {
           setParentMetaMask(walletAddress);
           database()
             .ref(`/users/${auth().currentUser.uid}`)
-            .update({ metaMaskWallet: walletAddress });
+            .update({metaMaskWallet: walletAddress});
         }
 
         Alert.alert('Sėkmė', `Prijungta piniginė: ${walletAddress}`);
