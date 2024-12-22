@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "927516005640",
+    "project_id": "reactnativedemo-abdd6",
+    "storage_bucket": "reactnativedemo-abdd6.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:927516005640:android:2cc528a1e90375994ec8bd",
+        "android_client_info": {
+          "package_name": "com.reactnativedemo2"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCsBmOp-3BswMSbE034uq50mxshUkZ5E7E"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
