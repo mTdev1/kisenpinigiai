@@ -1,51 +1,27 @@
 import React, { createContext, useState, useEffect } from 'react';
-import WalletConnect from '@walletconnect/client';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import {useWallet} from '../hooks/useWallet';
+
+const getBalance = hex => {
+  if (!hex) {
+    return 0;
+  }
+
+  return parseInt(hex, 16) / Math.pow(10, 18);
+};
 
 export const WalletConnectContext = createContext({
-  connector: null,
-  setConnector: () => {},
+  account: null,
+  connectToWallet: () => {},
+  balance: null,
+  connected: false,
 });
 
-export const WalletConnectProvider = ({ children }) => {
-  const [connector, setConnector] = useState(null);
-
-  useEffect(() => {
-    const initWalletConnect = async () => {
-      const walletConnector = new WalletConnect({
-        bridge: 'https://bridge.walletconnect.org', // Bridge server URL
-        storageOptions: {
-          asyncStorage: AsyncStorage,
-        },
-      });
-
-      if (!walletConnector.connected) {
-        walletConnector.createSession();
-      }
-
-      walletConnector.on('connect', (error, payload) => {
-        if (error) {
-          console.error(error);
-          return;
-        }
-        console.log('Connected:', payload);
-      });
-
-      walletConnector.on('disconnect', (error) => {
-        if (error) {
-          console.error(error);
-        }
-        console.log('Disconnected');
-      });
-
-      setConnector(walletConnector);
-    };
-
-    initWalletConnect();
-  }, []);
+export const WalletConnectProvider = ({children}) => {
+  const {account, connectToWallet, balance, connected, ethereum} = useWallet();
 
   return (
-    <WalletConnectContext.Provider value={{ connector, setConnector }}>
+    <WalletConnectContext.Provider
+      value={{account, connectToWallet, balance, connected}}>
       {children}
     </WalletConnectContext.Provider>
   );

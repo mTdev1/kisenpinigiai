@@ -10,13 +10,15 @@ import {
   ScrollView,
 } from 'react-native';
 import database from '@react-native-firebase/database';
+import {useWallet} from '../hooks/useWallet';
 
-const TaskDetailsScreen = ({ route, navigation }) => {
-  const { taskId, childId } = route.params;
+const TaskDetailsScreen = ({route, navigation}) => {
+  const {taskId, childId} = route.params;
 
   const [taskDetails, setTaskDetails] = useState({});
   const [taskProof, setTaskProof] = useState(null);
   const [userRole, setUserRole] = useState(null);
+  const {pay, convertEurToEth} = useWallet();
 
   useEffect(() => {
     const fetchUserRole = async () => {
@@ -58,62 +60,47 @@ const TaskDetailsScreen = ({ route, navigation }) => {
       Alert.alert('Klaida', 'Užduoties statusas neleidžia patvirtinimo.');
       return;
     }
-  
+
     try {
       const user = auth().currentUser;
       if (!user) {
         Alert.alert('Klaida', 'Vartotojas nėra autentifikuotas.');
         return;
       }
-  
+
       // Nuskaitome dabartinius tėvo ir vaiko balansus
       const parentRef = database().ref(`/users/${user.uid}`);
       const childRef = database().ref(`/users/${childId}`);
       const parentSnapshot = await parentRef.once('value');
       const childSnapshot = await childRef.once('value');
-  
+
       const parentData = parentSnapshot.val();
       const childData = childSnapshot.val();
-  
+
       if (!parentData || !childData) {
         Alert.alert('Klaida', 'Nepavyko nuskaityti balansų.');
         return;
       }
-  
+
       // Užduoties atlygis
       const rewardEUR = taskDetails.rewardEUR || 0;
-      const rewardETH = taskDetails.rewardETH || 0;
-  
-      const newParentBalanceEUR = (parentData.balanceEUR || 0) - rewardEUR;
-      const newParentBalanceETH = (parentData.balanceETH || 0) - rewardETH;
-      const newChildBalanceEUR = (childData.balanceEUR || 0) + rewardEUR;
-      const newChildBalanceETH = (childData.balanceETH || 0) + rewardETH;
-  
-      // Atnaujiname balansus
-      await parentRef.update({
-        balanceEUR: newParentBalanceEUR,
-        balanceETH: newParentBalanceETH,
-      });
-  
-      await childRef.update({
-        balanceEUR: newChildBalanceEUR,
-        balanceETH: newChildBalanceETH,
-      });
-  
+
+      await pay(rewardEUR, childData.metaMaskWallet);
+
       // Pridedame įrašą į balanso istoriją
-      const historyRef = database().ref(`/users/${user.uid}/children/${childId}/balanceHistory`);
-      await historyRef.push({
+      const historyRef = database().ref(
+        `/users/${user.uid}/children/${childId}/balanceHistory`,
+      );
+      historyRef.push({
         date: new Date().toISOString(),
         rewardEUR,
-        rewardETH,
-        parentBalanceEUR: newParentBalanceEUR,
-        parentBalanceETH: newParentBalanceETH,
+        rewardETH: convertEurToEth(rewardEUR),
       });
-  
+
       // Atnaujiname užduoties statusą
       const taskRef = database().ref(`/users/${childId}/tasks/${taskId}`);
-      await taskRef.update({ status: 'completed' });
-  
+      await taskRef.update({status: 'completed'});
+
       Alert.alert('Patvirtinta', 'Užduotis buvo patvirtinta.');
       navigation.goBack();
     } catch (error) {
@@ -121,8 +108,6 @@ const TaskDetailsScreen = ({ route, navigation }) => {
       Alert.alert('Klaida', 'Nepavyko patvirtinti užduoties.');
     }
   };
-  
-  
 
   const handleRejectTask = () => {
     if (taskDetails.status !== 'waiting_for_review') {
@@ -131,7 +116,8 @@ const TaskDetailsScreen = ({ route, navigation }) => {
     }
 
     const taskRef = database().ref(`/users/${childId}/tasks/${taskId}`);
-    taskRef.update({ status: 'failed' })
+    taskRef
+      .update({status: 'failed'})
       .then(() => {
         Alert.alert('Atmesta', 'Užduotis buvo atmesta.');
         navigation.goBack();
@@ -154,7 +140,11 @@ const TaskDetailsScreen = ({ route, navigation }) => {
     <ScrollView style={styles.container}>
       <Text style={styles.title}>Užduoties detalės</Text>
 
-      <View style={[styles.detailsContainer, { backgroundColor: getStatusColor(taskDetails.status) }]}>
+      <View
+        style={[
+          styles.detailsContainer,
+          {backgroundColor: getStatusColor(taskDetails.status)},
+        ]}>
         <Text style={styles.label}>Aprašymas:</Text>
         <Text style={styles.value}>{taskDetails.description || 'Nėra'}</Text>
 
@@ -177,7 +167,7 @@ const TaskDetailsScreen = ({ route, navigation }) => {
       {taskProof ? (
         <View style={styles.proofContainer}>
           <Text style={styles.label}>Vaiko pateikti įrodymai:</Text>
-          <Image source={{ uri: taskProof }} style={{ width: 200, height: 200 }} />
+          <Image source={{uri: taskProof}} style={{width: 200, height: 200}} />
         </View>
       ) : (
         taskDetails.status === 'waiting_for_review' && (
@@ -187,11 +177,15 @@ const TaskDetailsScreen = ({ route, navigation }) => {
 
       {taskDetails.status === 'waiting_for_review' && userRole === 'parent' && (
         <View style={styles.buttonContainer}>
-          <TouchableOpacity style={styles.approveButton} onPress={handleApproveTask}>
+          <TouchableOpacity
+            style={styles.approveButton}
+            onPress={handleApproveTask}>
             <Text style={styles.buttonText}>Patvirtinti</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.rejectButton} onPress={handleRejectTask}>
+          <TouchableOpacity
+            style={styles.rejectButton}
+            onPress={handleRejectTask}>
             <Text style={styles.buttonText}>Atmesti</Text>
           </TouchableOpacity>
         </View>
@@ -205,29 +199,35 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 16,
     backgroundColor: '#f9f9f9',
+    color: '#0d0c0c',
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 20,
     textAlign: 'center',
+    color: '#0d0c0c',
   },
   detailsContainer: {
     padding: 16,
     marginBottom: 20,
     borderRadius: 10,
+    color: '#0d0c0c',
   },
   label: {
     fontSize: 16,
     fontWeight: 'bold',
     marginTop: 10,
+    color: '#0d0c0c',
   },
   value: {
     fontSize: 16,
     marginBottom: 10,
+    color: '#0d0c0c',
   },
   proofContainer: {
     marginBottom: 20,
+    color: '#0d0c0c',
   },
   noProof: {
     fontSize: 16,
@@ -238,6 +238,7 @@ const styles = StyleSheet.create({
   buttonContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    color: '#0d0c0c',
   },
   approveButton: {
     flex: 1,
@@ -254,6 +255,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginLeft: 5,
     alignItems: 'center',
+    color: '#0d0c0c',
   },
   editButton: {
     backgroundColor: '#FFA500',
@@ -261,10 +263,12 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     marginTop: 20,
+    color: '#0d0c0c',
   },
   buttonText: {
     color: '#fff',
     fontWeight: 'bold',
+    color: '#0d0c0c',
   },
 });
 

@@ -12,7 +12,7 @@ import database from '@react-native-firebase/database';
 import auth from '@react-native-firebase/auth';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
-const CreateTaskScreen = ({ navigation }) => {
+const CreateTaskScreen = ({navigation}) => {
   const [children, setChildren] = useState([]);
   const [selectedChild, setSelectedChild] = useState(null);
   const [taskDescription, setTaskDescription] = useState('');
@@ -21,7 +21,7 @@ const CreateTaskScreen = ({ navigation }) => {
   const [deadline, setDeadline] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
 
-  const ethRate = 1800; // Pvz.: 1 ETH = 1800 EUR (atnaujinkite pagal realų kursą)
+  const ethRate = 3200;
 
   useEffect(() => {
     const user = auth().currentUser;
@@ -53,9 +53,9 @@ const CreateTaskScreen = ({ navigation }) => {
     };
   }, [navigation, selectedChild]);
 
-  const handleRewardChange = (eurValue) => {
+  const handleRewardChange = eurValue => {
     setRewardEUR(eurValue);
-    const ethValue = (parseFloat(eurValue) / ethRate).toFixed(6); // Konvertuoti į ETH
+    const ethValue = (parseFloat(eurValue || '0') / ethRate).toFixed(6); // Konvertuoti į ETH
     setRewardETH(ethValue);
   };
 
@@ -83,7 +83,10 @@ const CreateTaskScreen = ({ navigation }) => {
         navigation.goBack();
       })
       .catch(error => {
-        Alert.alert('Klaida', 'Nepavyko sukurti užduoties. Bandykite dar kartą.');
+        Alert.alert(
+          'Klaida',
+          'Nepavyko sukurti užduoties. Bandykite dar kartą.',
+        );
         console.error('Task creation error:', error);
       });
   };
@@ -97,8 +100,7 @@ const CreateTaskScreen = ({ navigation }) => {
       <Picker
         selectedValue={selectedChild}
         onValueChange={value => setSelectedChild(value)}
-        style={styles.picker}
-      >
+        style={styles.picker}>
         {children.map(child => (
           <Picker.Item key={child.id} label={child.name} value={child.id} />
         ))}
@@ -128,8 +130,7 @@ const CreateTaskScreen = ({ navigation }) => {
       <Text style={styles.label}>Atlikimo terminas:</Text>
       <TouchableOpacity
         style={styles.datePickerButton}
-        onPress={() => setShowDatePicker(true)}
-      >
+        onPress={() => setShowDatePicker(true)}>
         <Text style={styles.datePickerText}>
           {deadline.toLocaleDateString()}
         </Text>
@@ -152,8 +153,7 @@ const CreateTaskScreen = ({ navigation }) => {
       <TouchableOpacity
         style={styles.saveButton}
         onPress={handleCreateTask}
-        activeOpacity={0.7}
-      >
+        activeOpacity={0.7}>
         <Text style={styles.saveButtonText}>Sukurti užduotį</Text>
       </TouchableOpacity>
     </View>
@@ -171,15 +171,18 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 20,
     textAlign: 'center',
+    color: '#050505',
   },
   label: {
     fontSize: 16,
     marginBottom: 10,
+    color: '#050505',
   },
   picker: {
     marginBottom: 20,
     backgroundColor: '#fff',
     borderRadius: 5,
+    color: '#050505',
   },
   input: {
     backgroundColor: '#fff',
@@ -188,6 +191,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     borderWidth: 1,
     borderColor: '#ccc',
+    color: '#050505',
   },
   ethText: {
     fontSize: 16,
@@ -202,9 +206,11 @@ const styles = StyleSheet.create({
     borderColor: '#ccc',
     marginBottom: 20,
     alignItems: 'center',
+    color: '#050505',
   },
   datePickerText: {
     fontSize: 16,
+    color: '#050505',
   },
   saveButton: {
     backgroundColor: '#6200ee',

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, {useContext, useEffect, useState} from 'react';
 import {
   View,
   Text,
@@ -12,18 +12,21 @@ import {
 } from 'react-native';
 import database from '@react-native-firebase/database';
 import auth from '@react-native-firebase/auth';
-import { launchCamera } from 'react-native-image-picker'; // Image Picker import
+import {launchCamera} from 'react-native-image-picker'; // Image Picker import
+import {useWallet} from '../hooks/useWallet';
 
-const ChildHomeScreen = ({ navigation }) => {
+const ChildHomeScreen = ({navigation}) => {
   const [tasks, setTasks] = useState([]);
   const [completedTasks, setCompletedTasks] = useState([]);
   const [pendingTasks, setPendingTasks] = useState([]);
   const [failedTasks, setFailedTasks] = useState([]);
-  const [balance, setBalance] = useState({ ETH: 0, EUR: 0 });
   const [userName, setUserName] = useState('');
+  const [balance, setBalance] = useState(0);
+  const [userId, setUserId] = useState('');
   const [submissionTask, setSubmissionTask] = useState(null);
   const [description, setDescription] = useState('');
   const [photoURI, setPhotoURI] = useState(null); // Saugo nuotraukos URI
+  const {getAccountBalance, convertEthToEur} = useWallet();
 
   useEffect(() => {
     const user = auth().currentUser;
@@ -39,10 +42,6 @@ const ChildHomeScreen = ({ navigation }) => {
       .on('value', snapshot => {
         const data = snapshot.val() || {};
         setUserName(data.name || 'Vaikas');
-        setBalance({
-          ETH: data.balanceETH || 0,
-          EUR: data.balanceEUR || 0,
-        });
         const tasks = data.tasks || {};
         const allTasks = Object.entries(tasks).map(([id, task]) => ({
           id,
@@ -50,25 +49,29 @@ const ChildHomeScreen = ({ navigation }) => {
         }));
         setTasks(allTasks.filter(task => task.status === 'active'));
         setCompletedTasks(allTasks.filter(task => task.status === 'completed'));
-        setPendingTasks(allTasks.filter(task => task.status === 'waiting_for_review'));
+        setPendingTasks(
+          allTasks.filter(task => task.status === 'waiting_for_review'),
+        );
         setFailedTasks(allTasks.filter(task => task.status === 'failed'));
+        console.log('data', data);
+        getAccountBalance(data.metaMaskWallet).then(result => {
+          setUserId(user.uid);
+          setBalance(result);
+        });
       });
   }, []);
 
   const handleCapturePhoto = async () => {
-    launchCamera(
-      { mediaType: 'photo', includeBase64: true },
-      response => {
-        if (response.didCancel) {
-          Alert.alert('Atšaukta', 'Nuotraukos pasirinkimas buvo atšauktas.');
-        } else if (response.errorCode) {
-          Alert.alert('Klaida', `Kameros klaida: ${response.errorMessage}`);
-        } else if (response.assets && response.assets.length > 0) {
-          const base64Image = response.assets[0].base64;
-          setPhotoURI(`data:image/jpeg;base64,${base64Image}`); // Saugo Base64 kaip URI
-        }
+    launchCamera({mediaType: 'photo', includeBase64: true}, response => {
+      if (response.didCancel) {
+        Alert.alert('Atšaukta', 'Nuotraukos pasirinkimas buvo atšauktas.');
+      } else if (response.errorCode) {
+        Alert.alert('Klaida', `Kameros klaida: ${response.errorMessage}`);
+      } else if (response.assets && response.assets.length > 0) {
+        const base64Image = response.assets[0].base64;
+        setPhotoURI(`data:image/jpeg;base64,${base64Image}`); // Saugo Base64 kaip URI
       }
-    );
+    });
   };
 
   const submitTask = async taskID => {
@@ -81,20 +84,16 @@ const ChildHomeScreen = ({ navigation }) => {
 
     try {
       if (photoURI) {
-        await database()
-          .ref(`/users/${user.uid}/tasks/${taskID}`)
-          .update({
-            status: 'waiting_for_review',
-            description: description,
-            proofImageBase64: photoURI, // Saugo Base64 nuotrauką tiesiai į DB
-          });
+        await database().ref(`/users/${user.uid}/tasks/${taskID}`).update({
+          status: 'waiting_for_review',
+          description: description,
+          proofImageBase64: photoURI, // Saugo Base64 nuotrauką tiesiai į DB
+        });
       } else {
-        await database()
-          .ref(`/users/${user.uid}/tasks/${taskID}`)
-          .update({
-            status: 'waiting_for_review',
-            description: description,
-          });
+        await database().ref(`/users/${user.uid}/tasks/${taskID}`).update({
+          status: 'waiting_for_review',
+          description: description,
+        });
       }
 
       Alert.alert('Pateikta', 'Užduotis pateikta tėvų patvirtinimui.');
@@ -124,15 +123,21 @@ const ChildHomeScreen = ({ navigation }) => {
       style={styles.taskItem}
       onPress={() => {
         if (!action) {
-          navigation.navigate('TaskDetails', { taskId: task.id, childId: auth().currentUser.uid });
+          navigation.navigate('TaskDetails', {
+            taskId: task.id,
+            childId: auth().currentUser.uid,
+          });
         } else {
           action(task.id);
         }
-      }}
-    >
-      <Text>Užduotis: {task.description}</Text>
-      <Text>Atlygis: {task.rewardETH} ETH ({task.rewardEUR} EUR)</Text>
-      <Text>Terminas: {new Date(task.deadline).toLocaleString()}</Text>
+      }}>
+      <Text style={{color: '#6e6969'}}>Užduotis: {task.description}</Text>
+      <Text style={{color: '#6e6969'}}>
+        Atlygis: {task.rewardETH} ETH ({task.rewardEUR} EUR)
+      </Text>
+      <Text style={{color: '#6e6969'}}>
+        Terminas: {new Date(task.deadline).toLocaleString()}
+      </Text>
       {action && <Button title={actionLabel} onPress={() => action(task.id)} />}
     </TouchableOpacity>
   );
@@ -145,17 +150,23 @@ const ChildHomeScreen = ({ navigation }) => {
       </TouchableOpacity>
 
       <Text style={styles.title}>Labas, {userName}!</Text>
-      <Text>Balansas: {balance.ETH} ETH ({balance.EUR} EUR)</Text>
+      <Text style={{color: '#6e6969'}}>
+        Balansas: {balance} ETH ({convertEthToEur(balance)} EUR)
+      </Text>
 
       {/* Atliekamos užduotys */}
       <Text style={styles.sectionTitle}>Atliekamos užduotys</Text>
       <FlatList
         data={tasks}
         keyExtractor={item => item.id}
-        renderItem={({ item }) =>
+        renderItem={({item}) =>
           renderTask(item, 'Pateikti užduotį', () => setSubmissionTask(item))
         }
-        ListEmptyComponent={<Text>Šiuo metu nėra aktyvių užduočių.</Text>}
+        ListEmptyComponent={
+          <Text style={{color: '#6e6969'}}>
+            Šiuo metu nėra aktyvių užduočių.
+          </Text>
+        }
       />
 
       {/* Laukiama peržiūros */}
@@ -163,8 +174,12 @@ const ChildHomeScreen = ({ navigation }) => {
       <FlatList
         data={pendingTasks}
         keyExtractor={item => item.id}
-        renderItem={({ item }) => renderTask(item)} // Tik rodymas su navigacija
-        ListEmptyComponent={<Text>Šiuo metu nėra laukiamų peržiūros užduočių.</Text>}
+        renderItem={({item}) => renderTask(item)} // Tik rodymas su navigacija
+        ListEmptyComponent={
+          <Text style={{color: '#6e6969'}}>
+            Šiuo metu nėra laukiamų peržiūros užduočių.
+          </Text>
+        }
       />
 
       {/* Atliktos užduotys */}
@@ -172,8 +187,12 @@ const ChildHomeScreen = ({ navigation }) => {
       <FlatList
         data={completedTasks}
         keyExtractor={item => item.id}
-        renderItem={({ item }) => renderTask(item)} // Tik rodymas su navigacija
-        ListEmptyComponent={<Text>Šiuo metu nėra atliktų užduočių.</Text>}
+        renderItem={({item}) => renderTask(item)} // Tik rodymas su navigacija
+        ListEmptyComponent={
+          <Text style={{color: '#6e6969'}}>
+            Šiuo metu nėra atliktų užduočių.
+          </Text>
+        }
       />
 
       {/* Neįvykdytos užduotys */}
@@ -181,8 +200,12 @@ const ChildHomeScreen = ({ navigation }) => {
       <FlatList
         data={failedTasks}
         keyExtractor={item => item.id}
-        renderItem={({ item }) => renderTask(item)} // Tik rodymas su navigacija
-        ListEmptyComponent={<Text>Šiuo metu nėra neįvykdytų užduočių.</Text>}
+        renderItem={({item}) => renderTask(item)} // Tik rodymas su navigacija
+        ListEmptyComponent={
+          <Text style={{color: '#6e6969'}}>
+            Šiuo metu nėra neįvykdytų užduočių.
+          </Text>
+        }
       />
 
       {/* Užduoties pateikimo modalas */}
@@ -193,23 +216,22 @@ const ChildHomeScreen = ({ navigation }) => {
           <TextInput
             style={styles.input}
             placeholder="Aprašymas apie atliktą užduotį"
+            placeholderTextColor="#0d0c0c"
             value={description}
             onChangeText={setDescription}
           />
           {photoURI && (
-            <Image source={{ uri: photoURI }} style={styles.imagePreview} />
+            <Image source={{uri: photoURI}} style={styles.imagePreview} />
           )}
           <Button title="Nufotografuoti" onPress={handleCapturePhoto} />
           <TouchableOpacity
             style={styles.button}
-            onPress={() => submitTask(submissionTask.id)}
-          >
+            onPress={() => submitTask(submissionTask.id)}>
             <Text style={styles.buttonText}>Pateikti</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.button, styles.cancelButton]}
-            onPress={() => setSubmissionTask(null)}
-          >
+            onPress={() => setSubmissionTask(null)}>
             <Text style={styles.buttonText}>Atšaukti</Text>
           </TouchableOpacity>
         </View>
@@ -235,6 +257,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     elevation: 5,
     zIndex: 10,
+    color: '#0d0c0c',
   },
   logoutText: {
     color: '#fff',
@@ -245,12 +268,14 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 20,
+    color: '#0d0c0c',
   },
   sectionTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     marginTop: 20,
     marginBottom: 10,
+    color: '#0d0c0c',
   },
   taskItem: {
     padding: 10,
@@ -259,6 +284,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 5,
+    color: '#0d0c0c',
   },
   modal: {
     position: 'absolute',
@@ -271,11 +297,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#ddd',
     zIndex: 10,
+    color: '#0d0c0c',
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 10,
+    color: '#0d0c0c',
   },
   input: {
     borderWidth: 1,
@@ -283,11 +311,13 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     padding: 10,
     marginVertical: 10,
+    color: '#0d0c0c',
   },
   imagePreview: {
     width: '100%',
     height: 200,
     marginVertical: 10,
+    color: '#0d0c0c',
   },
   button: {
     backgroundColor: '#6200ee',
@@ -295,6 +325,7 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     marginVertical: 5,
     alignItems: 'center',
+    color: '#0d0c0c',
   },
   cancelButton: {
     backgroundColor: '#ff4444',

@@ -53,6 +53,7 @@ const LoginScreen = ({ navigation }) => {
       <Text style={styles.title}>Login</Text>
       <TextInput
         placeholder="Email"
+        placeholderTextColor="#050505"
         style={styles.input}
         value={email}
         onChangeText={setEmail}
@@ -61,6 +62,7 @@ const LoginScreen = ({ navigation }) => {
       />
       <TextInput
         placeholder="Password"
+        placeholderTextColor="#050505"
         style={styles.input}
         value={password}
         onChangeText={setPassword}
@@ -83,19 +85,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 16,
+
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 20,
+    color: "#050505",
   },
   input: {
     width: '100%',
     padding: 10,
     borderWidth: 1,
-    borderColor: '#ccc',
+    borderColor: '#506fad',
     borderRadius: 5,
     marginBottom: 15,
+    color: "#050505",
+
   },
   button: {
     backgroundColor: '#6200ee',
@@ -104,17 +110,22 @@ const styles = StyleSheet.create({
     width: '100%',
     alignItems: 'center',
     marginBottom: 10,
+
   },
   buttonText: {
     color: '#fff',
     fontWeight: 'bold',
+
   },
   linkButton: {
     marginTop: 10,
+
+
   },
   linkText: {
     color: '#6200ee',
     textDecorationLine: 'underline',
+
   },
 });
 

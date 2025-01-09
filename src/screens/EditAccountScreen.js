@@ -10,11 +10,11 @@ import {
 } from 'react-native';
 import database from '@react-native-firebase/database';
 import auth from '@react-native-firebase/auth';
-import { WalletConnectContext } from './WalletConnectProvider'; // WalletConnect kontekstas
+import {useWallet} from '../hooks/useWallet';
 
-const EditAccountScreen = ({ route, navigation }) => {
-  const { accountId, isChild } = route.params || {};
-  const { connector } = useContext(WalletConnectContext);
+const EditAccountScreen = ({route, navigation}) => {
+  const {accountId, isChild} = route.params || {};
+  const {account, connectToWallet, connected} = useWallet();
 
   const [parentName, setParentName] = useState('');
   const [parentPassword, setParentPassword] = useState('');
@@ -31,7 +31,7 @@ const EditAccountScreen = ({ route, navigation }) => {
     if (parentUID) {
       // Gauti tėvo informaciją
       const parentRef = database().ref(`/users/${parentUID}`);
-      parentRef.once('value', (snapshot) => {
+      parentRef.once('value', snapshot => {
         const data = snapshot.val();
         if (data) {
           setParentName(data.name || '');
@@ -41,8 +41,10 @@ const EditAccountScreen = ({ route, navigation }) => {
 
       // Gauti vaiko informaciją, jei pasirinktas vaikas
       if (accountId) {
-        const childRef = database().ref(`/users/${parentUID}/children/${accountId}`);
-        childRef.once('value', (snapshot) => {
+        const childRef = database().ref(
+          `/users/${parentUID}/children/${accountId}`,
+        );
+        childRef.once('value', snapshot => {
           const data = snapshot.val();
           if (data) {
             setChildName(data.name || '');
@@ -52,47 +54,6 @@ const EditAccountScreen = ({ route, navigation }) => {
       }
     }
   }, [accountId]);
-
-  const connectMetaMask = async (isChild) => {
-    try {
-      if (!connector) {
-        Alert.alert('Klaida', 'WalletConnect nėra tinkamai nustatytas.');
-        return;
-      }
-
-      if (!connector?.connected) {
-        await connector.createSession();
-      }
-
-      connector?.on('connect', (error, payload) => {
-        if (error) {
-          console.error('MetaMask klaida:', error);
-          Alert.alert('Klaida', 'Nepavyko prisijungti prie MetaMask.');
-          return;
-        }
-
-        const {accounts} = payload.params[0];
-        const walletAddress = accounts[0];
-
-        if (isChild) {
-          setChildMetaMask(walletAddress);
-          database()
-            .ref(`/users/${auth().currentUser.uid}/children/${accountId}`)
-            .update({metaMaskWallet: walletAddress});
-        } else {
-          setParentMetaMask(walletAddress);
-          database()
-            .ref(`/users/${auth().currentUser.uid}`)
-            .update({metaMaskWallet: walletAddress});
-        }
-
-        Alert.alert('Sėkmė', `Prijungta piniginė: ${walletAddress}`);
-      });
-    } catch (error) {
-      console.error('MetaMask prisijungimo klaida:', error);
-      Alert.alert('Klaida', 'Nepavyko prijungti MetaMask piniginės.');
-    }
-  };
 
   const handleUpdateParentInfo = () => {
     if (parentPassword && parentPassword !== parentConfirmPassword) {
@@ -106,13 +67,13 @@ const EditAccountScreen = ({ route, navigation }) => {
     }
 
     const parentUID = auth().currentUser?.uid;
-    const updates = { name: parentName, metaMaskWallet: parentMetaMask };
+    const updates = {name: parentName, metaMaskWallet: parentMetaMask};
 
     if (parentPassword) {
       auth()
         .currentUser.updatePassword(parentPassword)
-        .catch((error) =>
-          Alert.alert('Klaida', 'Nepavyko atnaujinti tėvo slaptažodžio.')
+        .catch(error =>
+          Alert.alert('Klaida', 'Nepavyko atnaujinti tėvo slaptažodžio.'),
         );
     }
 
@@ -120,7 +81,7 @@ const EditAccountScreen = ({ route, navigation }) => {
       .ref(`/users/${parentUID}`)
       .update(updates)
       .then(() => Alert.alert('Sėkmė', 'Tėvo informacija atnaujinta.'))
-      .catch((error) => Alert.alert('Klaida', error.message));
+      .catch(error => Alert.alert('Klaida', error.message));
   };
 
   const handleUpdateChildInfo = () => {
@@ -140,13 +101,15 @@ const EditAccountScreen = ({ route, navigation }) => {
     }
 
     const parentUID = auth().currentUser?.uid;
-    const updates = { name: childName, metaMaskWallet: childMetaMask };
+    const updates = {name: childName, metaMaskWallet: childMetaMask};
+
+    database().ref(`/users/${accountId}`).update(updates);
 
     database()
       .ref(`/users/${parentUID}/children/${accountId}`)
       .update(updates)
       .then(() => Alert.alert('Sėkmė', 'Vaiko informacija atnaujinta.'))
-      .catch((error) => Alert.alert('Klaida', error.message));
+      .catch(error => Alert.alert('Klaida', error.message));
   };
 
   return (
@@ -158,12 +121,14 @@ const EditAccountScreen = ({ route, navigation }) => {
         <Text style={styles.blockTitle}>Tėvo informacija</Text>
         <TextInput
           placeholder="Tėvo vardas"
+          placeholderTextColor="#050505"
           style={styles.input}
           value={parentName}
           onChangeText={setParentName}
         />
         <TextInput
           placeholder="Naujas slaptažodis (pasirinktinai)"
+          placeholderTextColor="#050505"
           style={styles.input}
           value={parentPassword}
           onChangeText={setParentPassword}
@@ -171,6 +136,7 @@ const EditAccountScreen = ({ route, navigation }) => {
         />
         <TextInput
           placeholder="Patvirtinti slaptažodį"
+          placeholderTextColor="#050505"
           style={styles.input}
           value={parentConfirmPassword}
           onChangeText={setParentConfirmPassword}
@@ -178,14 +144,19 @@ const EditAccountScreen = ({ route, navigation }) => {
         />
         <TextInput
           placeholder="MetaMask piniginės adresas"
+          placeholderTextColor="#050505"
           style={styles.input}
-          value={parentMetaMask}
-          onChangeText={setParentMetaMask}
+          editable={false}
+          value={account}
         />
-        <TouchableOpacity style={styles.button} onPress={() => connectMetaMask(false)}>
-          <Text style={styles.buttonText}>Prijungti MetaMask</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.button} onPress={handleUpdateParentInfo}>
+        {!account || !connected ? (
+          <TouchableOpacity style={styles.button} onPress={connectToWallet}>
+            <Text style={styles.buttonText}>Prijungti MetaMask</Text>
+          </TouchableOpacity>
+        ) : null}
+        <TouchableOpacity
+          style={styles.button}
+          onPress={handleUpdateParentInfo}>
           <Text style={styles.buttonText}>Atnaujinti tėvo informaciją</Text>
         </TouchableOpacity>
       </View>
@@ -196,12 +167,14 @@ const EditAccountScreen = ({ route, navigation }) => {
           <Text style={styles.blockTitle}>Vaiko informacija</Text>
           <TextInput
             placeholder="Vaiko vardas"
+            placeholderTextColor="#050505"
             style={styles.input}
             value={childName}
             onChangeText={setChildName}
           />
           <TextInput
             placeholder="Naujas slaptažodis (pasirinktinai)"
+            placeholderTextColor="#050505"
             style={styles.input}
             value={childPassword}
             onChangeText={setChildPassword}
@@ -209,6 +182,7 @@ const EditAccountScreen = ({ route, navigation }) => {
           />
           <TextInput
             placeholder="Patvirtinti slaptažodį"
+            placeholderTextColor="#050505"
             style={styles.input}
             value={childConfirmPassword}
             onChangeText={setChildConfirmPassword}
@@ -216,14 +190,14 @@ const EditAccountScreen = ({ route, navigation }) => {
           />
           <TextInput
             placeholder="MetaMask piniginės adresas"
+            placeholderTextColor="#050505"
             style={styles.input}
             value={childMetaMask}
             onChangeText={setChildMetaMask}
           />
-          <TouchableOpacity style={styles.button} onPress={() => connectMetaMask(true)}>
-            <Text style={styles.buttonText}>Prijungti MetaMask</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.button} onPress={handleUpdateChildInfo}>
+          <TouchableOpacity
+            style={styles.button}
+            onPress={handleUpdateChildInfo}>
             <Text style={styles.buttonText}>Atnaujinti vaiko informaciją</Text>
           </TouchableOpacity>
         </View>
@@ -237,12 +211,14 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     padding: 16,
     backgroundColor: '#f9f9f9',
+    color: '#050505',
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 20,
     textAlign: 'center',
+    color: '#050505',
   },
   block: {
     marginBottom: 20,
@@ -251,11 +227,13 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1,
     borderColor: '#ccc',
+    color: '#050505',
   },
   blockTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 10,
+    color: '#050505',
   },
   input: {
     width: '100%',
@@ -264,6 +242,7 @@ const styles = StyleSheet.create({
     borderColor: '#ccc',
     borderRadius: 5,
     marginBottom: 15,
+    color: '#050505',
   },
   button: {
     backgroundColor: '#6200ee',
@@ -271,6 +250,7 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     alignItems: 'center',
     marginTop: 10,
+    color: '#050505',
   },
   buttonText: {
     color: '#fff',

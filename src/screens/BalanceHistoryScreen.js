@@ -97,22 +97,26 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 16,
     backgroundColor: '#f9f9f9',
+    color: '#0d0c0c',
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 10,
     textAlign: 'center',
+    color: '#0d0c0c',
   },
   balanceText: {
     fontSize: 18,
     marginBottom: 20,
     textAlign: 'center',
+    color: '#0d0c0c',
   },
   historyItem: {
     padding: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#ccc',
+    color: '#0d0c0c',
   },
   historyText: {
     fontSize: 13,

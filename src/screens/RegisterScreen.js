@@ -52,12 +52,15 @@ const RegisterScreen = ({ navigation }) => {
       <Text style={styles.title}>Registracija</Text>
       <TextInput
         placeholder="Vardas"
+        placeholderTextColor= "#050505"
         style={styles.input}
         value={name}
         onChangeText={setName}
+
       />
       <TextInput
         placeholder="El. paštas"
+        placeholderTextColor="#050505"
         style={styles.input}
         value={email}
         onChangeText={setEmail}
@@ -66,6 +69,7 @@ const RegisterScreen = ({ navigation }) => {
       />
       <TextInput
         placeholder="Slaptažodis"
+        placeholderTextColor="#050505"
         style={styles.input}
         value={password}
         onChangeText={setPassword}
@@ -89,6 +93,7 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 20,
+    color: "#050505",
   },
   input: {
     width: '100%',
@@ -97,6 +102,7 @@ const styles = StyleSheet.create({
     borderColor: '#ccc',
     borderRadius: 5,
     marginBottom: 15,
+    color: "#050505",
   },
   button: {
     backgroundColor: '#6200ee',
@@ -105,6 +111,7 @@ const styles = StyleSheet.create({
     width: '100%',
     alignItems: 'center',
     marginBottom: 10,
+
   },
   buttonText: {
     color: '#fff',

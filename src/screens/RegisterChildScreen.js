@@ -3,7 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'reac
 import auth from '@react-native-firebase/auth';
 import database from '@react-native-firebase/database';
 
-const RegisterChildScreen = ({ navigation }) => {
+const RegisterChildScreen = ({navigation}) => {
   const [childName, setChildName] = useState('');
   const [childEmail, setChildEmail] = useState('');
   const [childPassword, setChildPassword] = useState('');
@@ -20,7 +20,6 @@ const RegisterChildScreen = ({ navigation }) => {
       return;
     }
 
-
     const parent = auth().currentUser;
 
     if (!parent) {
@@ -32,42 +31,33 @@ const RegisterChildScreen = ({ navigation }) => {
     const parentEmail = parent.email; // Išsaugome tėvo el. paštą
 
     try {
+      await auth().signInWithEmailAndPassword(parentEmail, parentPassword); // Prisijungiame tėvą
       // Sukuriame vaiko paskyrą Firebase Authentication
       const childCredential = await auth().createUserWithEmailAndPassword(
         childEmail,
-        childPassword
+        childPassword,
       );
+
+      await auth().signInWithEmailAndPassword(parentEmail, parentPassword);
 
       const childUID = childCredential.user.uid;
 
       // Pridedame vaiką į tėvo vaikų sąrašą
-      await database()
-        .ref(`/users/${parentUID}/children/${childUID}`)
-        .set({
-          name: childName,
-          email: childEmail,
-        });
+      await database().ref(`/users/${parentUID}/children/${childUID}`).set({
+        name: childName,
+        email: childEmail,
+      });
 
       // Pridedame vaiko duomenis į atskirą duomenų bazės įrašą
-      await database()
-        .ref(`/users/${childUID}`)
-        .set({
-          name: childName,
-          email: childEmail,
-          role: 'child',
-          parentUID: parentUID,
-        });
-
-      // Grįžtame prie tėvo paskyros
-      await auth().signInWithEmailAndPassword(parentEmail, parentPassword);
+      await database().ref(`/users/${childUID}`).set({
+        name: childName,
+        email: childEmail,
+        role: 'child',
+        parentUID: parentUID,
+      });
 
       Alert.alert('Sėkminga registracija', 'Vaikas sėkmingai užregistruotas!');
 
-      // Išvalome laukus
-      setChildName('');
-      setChildEmail('');
-      setChildPassword('');
-      setParentPassword('');
       navigation.goBack();
     } catch (error) {
       console.error('Klaida registruojant vaiką:', error);
@@ -84,12 +74,14 @@ const RegisterChildScreen = ({ navigation }) => {
       <Text style={styles.title}>Vaiko registracija</Text>
       <TextInput
         placeholder="Vaiko vardas"
+        placeholderTextColor="#0d0c0c"
         style={styles.input}
         value={childName}
         onChangeText={setChildName}
       />
       <TextInput
         placeholder="Vaiko el. paštas"
+        placeholderTextColor="#0d0c0c"
         style={styles.input}
         value={childEmail}
         onChangeText={setChildEmail}
@@ -98,6 +90,7 @@ const RegisterChildScreen = ({ navigation }) => {
       />
       <TextInput
         placeholder="Vaiko slaptažodis"
+        placeholderTextColor="#0d0c0c"
         style={styles.input}
         value={childPassword}
         onChangeText={setChildPassword}
@@ -105,6 +98,7 @@ const RegisterChildScreen = ({ navigation }) => {
       />
       <TextInput
         placeholder="Tėvo slaptažodis"
+        placeholderTextColor="#0d0c0c"
         style={styles.input}
         value={parentPassword}
         onChangeText={setParentPassword}
@@ -123,11 +117,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 16,
+    color: '#0d0c0c',
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 20,
+    color: '#0d0c0c',
   },
   input: {
     width: '100%',
@@ -136,6 +132,7 @@ const styles = StyleSheet.create({
     borderColor: '#ccc',
     borderRadius: 5,
     marginBottom: 15,
+    color: '#0d0c0c',
   },
   button: {
     backgroundColor: '#6200ee',
@@ -144,6 +141,7 @@ const styles = StyleSheet.create({
     width: '100%',
     alignItems: 'center',
     marginBottom: 10,
+    color: '#0d0c0c',
   },
   buttonText: {
     color: '#fff',

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, {useState, useEffect, useContext} from 'react';
 import {
   View,
   Text,
@@ -9,16 +9,24 @@ import {
 } from 'react-native';
 import database from '@react-native-firebase/database';
 import auth from '@react-native-firebase/auth';
+import {useWallet} from '../hooks/useWallet';
 
-const ChildProgressScreen = ({ route, navigation }) => {
-  const { childId } = route.params;
+const ChildProgressScreen = ({route, navigation}) => {
+  const {childId, childWalletId} = route.params;
   const [childName, setChildName] = useState('');
   const [activeTasks, setActiveTasks] = useState([]);
   const [completedTasks, setCompletedTasks] = useState([]);
   const [failedTasks, setFailedTasks] = useState([]);
-  const [childBalance, setChildBalance] = useState({ eur: 0, eth: 0 });
+  const [childBalance, setChildBalance] = useState(0);
   const [pendingTasks, setPendingTasks] = useState([]);
 
+  const {getAccountBalance} = useWallet();
+
+  useEffect(() => {
+    getAccountBalance(childWalletId).then(result => {
+      setChildBalance(result);
+    });
+  }, []);
 
   useEffect(() => {
     if (!childId) {
@@ -40,10 +48,7 @@ const ChildProgressScreen = ({ route, navigation }) => {
       const data = snapshot.val();
       if (data) {
         setChildName(data.name || 'Vaikas');
-        setChildBalance({
-          eur: data.balanceEUR || 0,
-          eth: data.balanceETH || 0,
-        });
+        setChildBalance(data.balanceETH || 0);
       }
     });
 
@@ -58,7 +63,9 @@ const ChildProgressScreen = ({ route, navigation }) => {
       setActiveTasks(tasks.filter(task => task.status === 'active'));
       setCompletedTasks(tasks.filter(task => task.status === 'completed'));
       setFailedTasks(tasks.filter(task => task.status === 'failed'));
-      setPendingTasks(tasks.filter(task => task.status === 'waiting_for_review'));
+      setPendingTasks(
+        tasks.filter(task => task.status === 'waiting_for_review'),
+      );
     });
 
     return () => {
@@ -67,13 +74,12 @@ const ChildProgressScreen = ({ route, navigation }) => {
     };
   }, [childId, navigation]);
 
-  const renderTask = ({ item }) => (
+  const renderTask = ({item}) => (
     <TouchableOpacity
       style={styles.taskItem}
       onPress={() =>
-        navigation.navigate('TaskDetails', { taskId: item.id, childId })
-      }
-    >
+        navigation.navigate('TaskDetails', {taskId: item.id, childId})
+      }>
       <Text style={styles.taskDescription}>{item.description}</Text>
       <Text style={styles.taskReward}>
         Atlygis: €{item.rewardEUR} ({item.rewardETH} ETH)
@@ -91,43 +97,58 @@ const ChildProgressScreen = ({ route, navigation }) => {
 
       <View style={styles.balanceContainer}>
         <Text style={styles.balanceTitle}>Vaiko balansas:</Text>
-        <Text style={styles.balanceText}>EUR: €{childBalance.eur.toFixed(2)}</Text>
-        <Text style={styles.balanceText}>
-          ETH: {childBalance.eth.toFixed(6)} ETH
-        </Text>
+        {/* <Text style={styles.balanceText}>
+          EUR: €{childBalance.eur.toFixed(2)}
+        </Text> */}
+        <Text style={styles.balanceText}>ETH: {childBalance || 0} ETH</Text>
       </View>
 
       <Text style={styles.sectionTitle}>Atliekamos užduotys</Text>
       <FlatList
         data={activeTasks}
-        renderItem={({ item }) => item ? renderTask({ item }) : null}
+        renderItem={({item}) => (item ? renderTask({item}) : null)}
         keyExtractor={(item, index) => item?.id || index.toString()}
-        ListEmptyComponent={<Text>Šiuo metu nėra aktyvių užduočių.</Text>}
+        ListEmptyComponent={
+          <Text style={{color: '#6e6969'}}>
+            Šiuo metu nėra aktyvių užduočių.
+          </Text>
+        }
       />
 
       <Text style={styles.sectionTitle}>Laukiama peržiūros</Text>
       <FlatList
         data={pendingTasks}
-        renderItem={({ item }) => item ? renderTask({ item }) : null}
+        renderItem={({item}) => (item ? renderTask({item}) : null)}
         keyExtractor={(item, index) => item?.id || index.toString()}
-        ListEmptyComponent={<Text>Šiuo metu nėra laukiamų peržiūros užduočių.</Text>}
+        ListEmptyComponent={
+          <Text style={{color: '#6e6969'}}>
+            Šiuo metu nėra laukiamų peržiūros užduočių.
+          </Text>
+        }
       />
-
 
       <Text style={styles.sectionTitle}>Atliktos užduotys</Text>
       <FlatList
         data={completedTasks}
-        renderItem={({ item }) => item ? renderTask({ item }) : null}
+        renderItem={({item}) => (item ? renderTask({item}) : null)}
         keyExtractor={(item, index) => item?.id || index.toString()}
-        ListEmptyComponent={<Text>Šiuo metu nėra atliktų užduočių.</Text>}
+        ListEmptyComponent={
+          <Text style={{color: '#6e6969'}}>
+            Šiuo metu nėra atliktų užduočių.
+          </Text>
+        }
       />
 
       <Text style={styles.sectionTitle}>Neįvykdytos užduotys</Text>
       <FlatList
         data={failedTasks}
-        renderItem={({ item }) => item ? renderTask({ item }) : null}
+        renderItem={({item}) => (item ? renderTask({item}) : null)}
         keyExtractor={(item, index) => item?.id || index.toString()}
-        ListEmptyComponent={<Text>Šiuo metu nėra neįvykdytų užduočių.</Text>}
+        ListEmptyComponent={
+          <Text style={{color: '#6e6969'}}>
+            Šiuo metu nėra neįvykdytų užduočių.
+          </Text>
+        }
       />
     </View>
   );
@@ -138,12 +159,14 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 16,
     backgroundColor: '#f9f9f9',
+    color: '#050505',
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 20,
     textAlign: 'center',
+    color: '#050505',
   },
   balanceContainer: {
     padding: 10,
@@ -152,20 +175,23 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     borderWidth: 1,
     borderColor: '#ccc',
+    Color: '#050505',
   },
   balanceTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 10,
+    color: '#050505',
   },
   balanceText: {
     fontSize: 16,
-    color: '#555',
+    color: '#050505',
   },
   sectionTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     marginVertical: 10,
+    color: '#050505',
   },
   taskItem: {
     padding: 10,
@@ -174,10 +200,12 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     borderWidth: 1,
     borderColor: '#ccc',
+    color: '#050505',
   },
   taskDescription: {
     fontSize: 16,
     fontWeight: 'bold',
+    color: '#050505',
   },
   taskReward: {
     fontSize: 14,

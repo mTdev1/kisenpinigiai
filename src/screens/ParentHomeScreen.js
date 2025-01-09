@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, {useContext, useEffect, useState} from 'react';
 import {
   View,
   Text,
@@ -9,22 +9,24 @@ import {
 } from 'react-native';
 import auth from '@react-native-firebase/auth';
 import database from '@react-native-firebase/database';
-import { Picker } from '@react-native-picker/picker';
+import {Picker} from '@react-native-picker/picker';
+import {useWallet} from '../hooks/useWallet';
 
-const ParentHomeScreen = ({ navigation }) => {
+const ParentHomeScreen = ({navigation}) => {
   const [userName, setUserName] = useState('');
   const [children, setChildren] = useState([]);
   const [selectedChild, setSelectedChild] = useState(null);
-
-  // Mock balanso reikšmės
-  const [parentBalance, setParentBalance] = useState({
-    eur: '100.00',
-    eth: '0.05',
-  });
-  const [childBalance, setChildBalance] = useState({
-    eur: '50.00',
-    eth: '0.025',
-  });
+  const [childBalance, setChildBalance] = useState(0);
+  const {
+    account,
+    balance,
+    parseBalance,
+    connected,
+    connectToWallet,
+    convertEthToEur,
+    getAccountBalance,
+    pay,
+  } = useWallet();
 
   useEffect(() => {
     const user = auth().currentUser;
@@ -56,7 +58,7 @@ const ParentHomeScreen = ({ navigation }) => {
       }));
       setChildren(childrenList);
       if (childrenList.length > 0 && !selectedChild) {
-        setSelectedChild(childrenList[0].id);
+        setSelectedChild(childrenList[0]);
       }
     });
 
@@ -78,101 +80,144 @@ const ParentHomeScreen = ({ navigation }) => {
       });
   };
 
+  const getChildBalance = async () => {
+    if (connected) {
+      try {
+        const response = await getAccountBalance(selectedChild?.metaMaskWallet);
+        setChildBalance(response);
+      } catch (err) {
+        console.error('Error getting balance:', err);
+      }
+    }
+  };
+  const getCurrentAccountBalance = async () => {
+    await connectToWallet();
+    if (connected) {
+      try {
+        await getAccountBalance(account);
+      } catch (err) {
+        console.error('Error getting balance:', err);
+      }
+    }
+  };
+
+  useEffect(() => {
+    getAccountBalance(selectedChild?.metaMaskWallet).then(result => {
+      setChildBalance(result);
+    });
+  }, []);
+
   return (
     <ScrollView contentContainerStyle={styles.scrollContainer}>
       <View style={styles.container}>
         {/* Atsijungimo mygtukas */}
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout} activeOpacity={0.7}>
+        <TouchableOpacity
+          style={styles.logoutButton}
+          onPress={handleLogout}
+          activeOpacity={0.7}>
           <Text style={styles.logoutText}>⇦</Text>
         </TouchableOpacity>
-
         <Text style={styles.title}>Sveiki, {userName}!</Text>
-
         {/* Dropdown pasirinkti vaiką */}
         <Text style={styles.label}>Pasirinkite vaiką:</Text>
         <Picker
           selectedValue={selectedChild}
           onValueChange={value => setSelectedChild(value)}
-          style={styles.picker}
-        >
+          style={styles.picker}>
           {children.map(child => (
-            <Picker.Item
-              key={child.id}
-              label={child.name}
-              value={child.id}
-            />
+            <Picker.Item key={child.id} label={child.name} value={child} />
           ))}
         </Picker>
-
         {/* Kvadratiniai mygtukai */}
         <View style={styles.buttonGrid}>
-          <TouchableOpacity
-            style={styles.squareButton}
-            onPress={() =>
-              navigation.navigate('CreateTask', { childId: selectedChild })
-            }
-          >
-            <Text style={styles.buttonText}>Užduočių kūrimas</Text>
-          </TouchableOpacity>
+          {Boolean(selectedChild) && (
+            <TouchableOpacity
+              style={styles.squareButton}
+              onPress={() =>
+                navigation.navigate('CreateTask', {childId: selectedChild.id})
+              }>
+              <Text style={styles.buttonText}>Užduočių kūrimas</Text>
+            </TouchableOpacity>
+          )}
 
           <TouchableOpacity
             style={styles.squareButton}
             onPress={() => {
-                if (!selectedChild) {
+              if (!selectedChild) {
                 Alert.alert('Klaida', 'Prašome pasirinkti vaiką.');
                 return;
-                }
-                navigation.navigate('EditAccount', {
-                accountId: selectedChild, // Perduodame pasirinkto vaiko ID
+              }
+              navigation.navigate('EditAccount', {
+                accountId: selectedChild?.id, // Perduodame pasirinkto vaiko ID
                 isChild: true, // Nurodome, kad tai vaiko paskyra
-                });
-            }}
-            >
+              });
+            }}>
             <Text style={styles.buttonText}>Redaguoti paskyras</Text>
-            </TouchableOpacity>
-
-
+          </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.squareButton}
-            onPress={() => navigation.navigate('RegisterChild')}
-          >
+            onPress={() => navigation.navigate('RegisterChild')}>
             <Text style={styles.buttonText}>Vaikų registracija</Text>
           </TouchableOpacity>
 
+          {Boolean(selectedChild) && (
+            <TouchableOpacity
+              style={styles.squareButton}
+              onPress={() =>
+                navigation.navigate('ChildProgress', {
+                  childId: selectedChild.id,
+                  childWalletId: selectedChild.metaMaskWallet,
+                })
+              }>
+              <Text style={styles.buttonText}>Vaiko progreso istorija</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+        <View style={styles.footer}>
+          {Boolean(account) && connected ? (
+            <View style={styles.balanceContainer}>
+              <Text style={styles.balanceTitle}>Tėvo balansas:</Text>
+              {/* <Text style={styles.balanceText}>EUR: {account}</Text> */}
+              <Text style={styles.balanceText}>
+                ETH: {parseBalance(balance)} ETH
+              </Text>
+              <Text style={styles.balanceText}>
+                EUR: {convertEthToEur(parseBalance(balance))} €
+              </Text>
+
+              <Text style={styles.balanceTitle}>Vaiko balansas:</Text>
+              {/* <Text style={styles.balanceText}>EUR: €{childBalance.eur}</Text> */}
+              <Text style={styles.balanceText}>ETH: {childBalance} ETH</Text>
+              <Text style={styles.balanceText}>
+                EUR: {convertEthToEur(childBalance)} €
+              </Text>
+            </View>
+          ) : null}
           <TouchableOpacity
-            style={styles.squareButton}
+            style={styles.transactionButton}
             onPress={() =>
-              navigation.navigate('ChildProgress', { childId: selectedChild })
-            }
-          >
-            <Text style={styles.buttonText}>Vaiko progreso istorija</Text>
+              navigation.navigate('BalanceHistory', {
+                childId: selectedChild.id,
+              })
+            }>
+            <Text style={styles.transactionButtonText}>
+              Peržiūrėti sandorius
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.transactionButton}
+            onPress={() => getCurrentAccountBalance()}>
+            <Text style={styles.transactionButtonText}>Atnaujinti balansą</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.transactionButton}
+            onPress={() => getChildBalance()}>
+            <Text style={styles.transactionButtonText}>
+              Gauti vaiko balansą
+            </Text>
           </TouchableOpacity>
         </View>
-
-        {/* Balansų rodymas */}
-        <View style={styles.balanceContainer}>
-          <Text style={styles.balanceTitle}>Tėvo balansas:</Text>
-          <Text style={styles.balanceText}>EUR: €{parentBalance.eur}</Text>
-          <Text style={styles.balanceText}>ETH: {parentBalance.eth} ETH</Text>
-
-          <Text style={styles.balanceTitle}>Vaiko balansas:</Text>
-          <Text style={styles.balanceText}>EUR: €{childBalance.eur}</Text>
-          <Text style={styles.balanceText}>ETH: {childBalance.eth} ETH</Text>
-        </View>
-
-        {/* Peržiūrėti sandorius */}
-        <TouchableOpacity
-          style={styles.transactionButton}
-          onPress={() =>
-            navigation.navigate('BalanceHistory', {
-              childId: selectedChild, // Būtinai perduokite pasirinkto vaiko ID
-            })
-          }
-        >
-          <Text style={styles.transactionButtonText}>Peržiūrėti sandorius</Text>
-        </TouchableOpacity>
-
       </View>
     </ScrollView>
   );
@@ -210,21 +255,25 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 10,
     textAlign: 'center',
+    color: '#050505',
   },
   label: {
     fontSize: 16,
     marginBottom: 10,
+    color: '#050505',
   },
   picker: {
     marginBottom: 20,
     backgroundColor: '#fff',
     borderRadius: 5,
+    color: '#050505',
   },
   buttonGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
     marginBottom: 10,
+    color: '#050505',
   },
   squareButton: {
     width: '45%',
@@ -243,7 +292,7 @@ const styles = StyleSheet.create({
   balanceContainer: {
     marginTop: 10,
     padding: 10,
-    backgroundColor: '#e0e0e0',
+    backgroundColor: '#6e6969',
     borderRadius: 10,
   },
   balanceTitle: {
@@ -254,6 +303,7 @@ const styles = StyleSheet.create({
   balanceText: {
     fontSize: 16,
     marginBottom: 5,
+    color: '#fff',
   },
   transactionButton: {
     marginTop: 10,
@@ -263,9 +313,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   transactionButtonText: {
-    color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
+    color: '#050505',
+  },
+  footer: {
+    flex: 1,
+    justifyContent: 'flex-end',
   },
 });
 
