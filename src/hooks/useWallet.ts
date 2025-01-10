@@ -1,4 +1,4 @@
-import {useState} from 'react';
+import {useEffect, useState} from 'react';
 import {useSDK} from '@metamask/sdk-react';
 import {BigNumber, ethers} from 'ethers';
 
@@ -12,6 +12,23 @@ const parseBalance = (hex: string) => {
 
 const useWallet = () => {
   const [ethRate, setEthRate] = useState(3200);
+
+  useEffect(() => {
+    const fetchEthRate = async () => {
+      try {
+        const response = await fetch(
+          'https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=eur',
+        );
+        const data = await response.json();
+        setEthRate(data.ethereum.eur);
+        console.log('ETH rate:', data.ethereum.eur);
+      } catch (error) {
+        console.error('Error fetching ETH rate:', error);
+      }
+    };
+
+    fetchEthRate();
+  }, []);
 
   const {
     sdk,
